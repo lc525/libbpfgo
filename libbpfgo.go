@@ -74,6 +74,7 @@ const (
 	CgroupLegacy
 	Netns
 	Iter
+  USDT
 )
 
 type BPFLinkLegacy struct {
@@ -1167,6 +1168,29 @@ func doAttachUprobe(prog *BPFProg, isUretprobe bool, pid int, path string, offse
 		eventName: fmt.Sprintf("%s:%d:%d", path, pid, offset),
 	}
 	return bpfLink, nil
+}
+
+func (p *BPFProg) AttachUSDT(pid int, path string, provider string, probeName string) (*BPFLink, error) {
+  pidCint := C.int(pid)
+  pathCString := C.CString(path)
+  providerCString := C.CString(provider)
+  probeCString := C.CString(probeName)
+
+  link, errno := C.bpf_program__attach_usdt(p.prog, pidCint, pathCString, providerCString, probeCString, nil)
+  C.free(unsafe.Pointer(pathCString))
+  C.free(unsafe.Pointer(providerCString))
+  C.free(unsafe.Pointer(probeCString))
+  if link == nil {
+    return nil, fmt.Errorf("failed to attach usdt probe to program %s with pid %d, provider %s and probe %s: %w ", path, pid, provider, probeName, errno)
+  }
+
+  bpfLink := &BPFLink {
+    link:  link,
+    prog:  p,
+    linkType: USDT,
+    eventName: fmt.Sprintf("%s:%d:%s:%s", path, pid, provider, probeName),
+  }
+  return bpfLink, nil
 }
 
 type AttachFlag uint32
